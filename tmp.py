@@ -1,0 +1,1 @@
+print(sorted(["Linear Equations", "Quadratic Equations + ", "Functions", "Sequences and Series", "Geometry", "Number System", "Time and Work", "Profit and Loss", "Average, Ratio and Proportion", "Percentage", "Time Speed and Distance", "Mensuration", "Permutation and Combination", "Probability"]))
