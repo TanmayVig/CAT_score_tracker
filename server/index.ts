@@ -3,11 +3,9 @@ import express from "express";
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { fileURLToPath } from "node:url";
 import { CAT_SECTIONS, GAP_TOPICS, type CatSection, type MockAttempt, type MockAttemptInput, type SectionMap } from "../src/shared/cat.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectRoot = path.resolve(__dirname, "..");
+const projectRoot = process.cwd();
 const dataDir = path.join(projectRoot, "data");
 const dbPath = path.join(dataDir, "cat-tracker.sqlite");
 
@@ -18,6 +16,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS mocks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
+    attempt_date TEXT NOT NULL DEFAULT (date('now')),
     total_marks REAL NOT NULL,
     percentile REAL NOT NULL,
     sections TEXT NOT NULL,
@@ -26,9 +25,16 @@ db.exec(`
   );
 `);
 
+const mockColumns = db.prepare("PRAGMA table_info(mocks)").all() as Array<{ name: string }>;
+if (!mockColumns.some((column) => column.name === "attempt_date")) {
+  db.exec("ALTER TABLE mocks ADD COLUMN attempt_date TEXT NOT NULL DEFAULT '2026-05-05'");
+  db.exec("UPDATE mocks SET attempt_date = substr(created_at, 1, 10) WHERE created_at IS NOT NULL");
+}
+
 type MockRow = {
   id: number;
   name: string;
+  attempt_date: string;
   total_marks: number;
   percentile: number;
   sections: string;
@@ -46,6 +52,7 @@ function rowToMock(row: MockRow): MockAttempt {
   return {
     id: row.id,
     name: row.name,
+    attemptDate: row.attempt_date,
     totalMarks: row.total_marks,
     percentile: row.percentile,
     sections: JSON.parse(row.sections) as SectionMap,
@@ -58,6 +65,15 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function isValidDateInput(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 function validateMockPayload(payload: unknown): { value?: MockAttemptInput; error?: string } {
   const body = payload as MockAttemptInput;
 
@@ -67,6 +83,10 @@ function validateMockPayload(payload: unknown): { value?: MockAttemptInput; erro
 
   if (typeof body.name !== "string" || body.name.trim().length === 0) {
     return { error: "Mock name is required." };
+  }
+
+  if (!isValidDateInput(body.attemptDate)) {
+    return { error: "Attempt date must be a valid date." };
   }
 
   if (!isFiniteNumber(body.totalMarks) || body.totalMarks < -100 || body.totalMarks > 300) {
@@ -125,6 +145,7 @@ function validateMockPayload(payload: unknown): { value?: MockAttemptInput; erro
   return {
     value: {
       name: body.name.trim(),
+      attemptDate: body.attemptDate,
       totalMarks: body.totalMarks,
       percentile: body.percentile,
       sections
@@ -142,7 +163,7 @@ app.get("/api/health", (_request, response) => {
 });
 
 app.get("/api/mocks", (_request, response) => {
-  const rows = db.prepare("SELECT * FROM mocks ORDER BY datetime(created_at) DESC, id DESC").all() as MockRow[];
+  const rows = db.prepare("SELECT * FROM mocks ORDER BY date(attempt_date) DESC, datetime(created_at) DESC, id DESC").all() as MockRow[];
   response.json(rows.map(rowToMock));
 });
 
@@ -167,10 +188,10 @@ app.post("/api/mocks", (request, response) => {
   }
 
   const insert = db.prepare(`
-    INSERT INTO mocks (name, total_marks, percentile, sections)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO mocks (name, attempt_date, total_marks, percentile, sections)
+    VALUES (?, ?, ?, ?, ?)
   `);
-  const info = insert.run(result.value.name, result.value.totalMarks, result.value.percentile, JSON.stringify(result.value.sections));
+  const info = insert.run(result.value.name, result.value.attemptDate, result.value.totalMarks, result.value.percentile, JSON.stringify(result.value.sections));
   const mock = getMockById(Number(info.lastInsertRowid));
 
   response.status(201).json(mock);
@@ -193,11 +214,29 @@ app.put("/api/mocks/:id", (request, response) => {
 
   db.prepare(`
     UPDATE mocks
-    SET name = ?, total_marks = ?, percentile = ?, sections = ?, updated_at = datetime('now')
+    SET name = ?, attempt_date = ?, total_marks = ?, percentile = ?, sections = ?, updated_at = datetime('now')
     WHERE id = ?
-  `).run(result.value.name, result.value.totalMarks, result.value.percentile, JSON.stringify(result.value.sections), id);
+  `).run(result.value.name, result.value.attemptDate, result.value.totalMarks, result.value.percentile, JSON.stringify(result.value.sections), id);
 
   response.json(getMockById(id));
+});
+
+app.delete("/api/mocks/:id", (request, response) => {
+  const id = Number(request.params.id);
+
+  if (!Number.isInteger(id)) {
+    response.status(404).json({ error: "Mock not found." });
+    return;
+  }
+
+  const info = db.prepare("DELETE FROM mocks WHERE id = ?").run(id);
+
+  if (info.changes === 0) {
+    response.status(404).json({ error: "Mock not found." });
+    return;
+  }
+
+  response.status(204).send();
 });
 
 app.use((_request, response) => {

@@ -14,6 +14,10 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     throw new Error(body?.error ?? "Request failed.");
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
 }
 
@@ -32,5 +36,11 @@ export function updateMock(id: number, mock: MockAttemptInput): Promise<MockAtte
   return request<MockAttempt>(`/api/mocks/${id}`, {
     method: "PUT",
     body: JSON.stringify(mock)
+  });
+}
+
+export function deleteMock(id: number): Promise<void> {
+  return request<void>(`/api/mocks/${id}`, {
+    method: "DELETE"
   });
 }
