@@ -1,4 +1,4 @@
-import type { MockAttempt, MockAttemptInput } from "./shared/cat";
+import type { MockAttempt, MockAttemptInput, SmallTest, SmallTestInput } from "./shared/cat";
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -41,6 +41,30 @@ export function updateMock(id: number, mock: MockAttemptInput): Promise<MockAtte
 
 export function deleteMock(id: number): Promise<void> {
   return request<void>(`/api/mocks/${id}`, {
+    method: "DELETE"
+  });
+}
+
+export function fetchSmallTests(): Promise<SmallTest[]> {
+  return request<SmallTest[]>("/api/small-tests");
+}
+
+export function createSmallTest(test: SmallTestInput): Promise<SmallTest> {
+  return request<SmallTest>("/api/small-tests", {
+    method: "POST",
+    body: JSON.stringify(test)
+  });
+}
+
+export function updateSmallTest(id: number, test: SmallTestInput): Promise<SmallTest> {
+  return request<SmallTest>(`/api/small-tests/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(test)
+  });
+}
+
+export function deleteSmallTest(id: number): Promise<void> {
+  return request<void>(`/api/small-tests/${id}`, {
     method: "DELETE"
   });
 }
