@@ -1,16 +1,26 @@
 import type { ReactNode } from "react";
-import { BarChart3, ClipboardList, RefreshCw } from "lucide-react";
+import { BarChart3, ClipboardList, Download, RefreshCw } from "lucide-react";
 
 export type ActivePage = "mocks" | "small-tests";
+export type PageHandle = {
+  refresh: () => Promise<void>;
+  loading: boolean;
+  exportData?: () => void;
+  exportDisabled?: boolean;
+  exportLabel?: string;
+};
 
 type AppHeaderProps = {
   activePage: ActivePage;
   loading: boolean;
+  exportDisabled?: boolean;
+  exportLabel?: string;
   onRefresh: () => void;
+  onExport?: () => void;
   onPageChange: (page: ActivePage) => void;
 };
 
-export function AppHeader({ activePage, loading, onRefresh, onPageChange }: AppHeaderProps) {
+export function AppHeader({ activePage, loading, exportDisabled, exportLabel = "Export for LLM", onRefresh, onExport, onPageChange }: AppHeaderProps) {
   return (
     <>
       <header className="topbar">
@@ -18,10 +28,16 @@ export function AppHeader({ activePage, loading, onRefresh, onPageChange }: AppH
           <p className="eyebrow">Local CAT prep dashboard</p>
           <h1>CAT Mock Tracker</h1>
         </div>
-        <button className="ghost-button" type="button" onClick={onRefresh} disabled={loading}>
-          <RefreshCw aria-hidden="true" size={18} />
-          Refresh
-        </button>
+        <div className="topbar-actions">
+          <button className="ghost-button" type="button" onClick={onExport} disabled={!onExport || exportDisabled}>
+            <Download aria-hidden="true" size={18} />
+            {exportLabel}
+          </button>
+          <button className="ghost-button" type="button" onClick={onRefresh} disabled={loading}>
+            <RefreshCw aria-hidden="true" size={18} />
+            Refresh
+          </button>
+        </div>
       </header>
 
       <nav className="page-tabs" aria-label="Tracker section">

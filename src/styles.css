@@ -52,6 +52,13 @@ button:disabled {
   margin-bottom: 18px;
 }
 
+.topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .page-tabs {
   display: inline-flex;
   gap: 6px;
@@ -594,6 +601,10 @@ input[type="checkbox"] {
   .panel-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .topbar-actions {
+    justify-content: flex-start;
   }
 
   .field-grid,

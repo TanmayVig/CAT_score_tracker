@@ -14,7 +14,7 @@ import {
 import { createMock, deleteMock, fetchMocks, updateMock } from "../api";
 import { ChartFrame } from "../components/ChartFrame";
 import { AnalysisStatus, CheckboxField, ChipButton } from "../components/FormControls";
-import { PanelTitle } from "../components/PageScaffold";
+import { PanelTitle, type PageHandle } from "../components/PageScaffold";
 import {
   CAT_SECTIONS,
   GAP_TOPICS,
@@ -24,6 +24,7 @@ import {
   type MockAttemptInput,
 } from "../shared/cat";
 import { formatAttemptDate, getAnalysedPercentage } from "../utils/format";
+import { exportMocksForLLM } from "../utils/llmExport";
 import { cloneMockInput, toMockInput } from "../utils/mockTransforms";
 
 type MetricMode = "percentile" | "marks";
@@ -32,11 +33,6 @@ const sectionColors: Record<CatSection, string> = {
   VARC: "#2f80ed",
   DILR: "#16a34a",
   QA: "#b45309",
-};
-
-type PageHandle = {
-  refresh: () => Promise<void>;
-  loading: boolean;
 };
 
 type MocksPageProps = {
@@ -72,8 +68,14 @@ export function MocksPage({ onStatusChange }: MocksPageProps) {
   }, []);
 
   useEffect(() => {
-    onStatusChange({ refresh: loadMocks, loading });
-  }, [loading, onStatusChange]);
+    onStatusChange({
+      refresh: loadMocks,
+      loading,
+      exportData: () => exportMocksForLLM(mocks),
+      exportDisabled: mocks.length === 0,
+      exportLabel: "Export mocks",
+    });
+  }, [loading, mocks, onStatusChange]);
 
   const sortedForCharts = useMemo(
     () =>

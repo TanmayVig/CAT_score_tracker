@@ -1,16 +1,12 @@
 import { useCallback, useState } from "react";
-import { AppHeader, type ActivePage } from "./components/PageScaffold";
+import { AppHeader, type ActivePage, type PageHandle } from "./components/PageScaffold";
 import { MocksPage } from "./pages/MocksPage";
 import { SmallTestsPage } from "./pages/SmallTestsPage";
-
-type PageHandle = {
-  refresh: () => Promise<void>;
-  loading: boolean;
-};
 
 const idleHandle: PageHandle = {
   refresh: async () => {},
   loading: false,
+  exportDisabled: true,
 };
 
 function App() {
@@ -40,7 +36,10 @@ function App() {
       <AppHeader
         activePage={activePage}
         loading={pageHandles[activePage].loading}
+        exportDisabled={pageHandles[activePage].exportDisabled}
+        exportLabel={pageHandles[activePage].exportLabel}
         onRefresh={() => void pageHandles[activePage].refresh()}
+        onExport={pageHandles[activePage].exportData}
         onPageChange={setActivePage}
       />
 

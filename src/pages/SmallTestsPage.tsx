@@ -4,7 +4,7 @@ import { CartesianGrid, Legend, Line, LineChart, Tooltip, XAxis, YAxis } from "r
 import { createSmallTest, deleteSmallTest, fetchSmallTests, updateSmallTest } from "../api";
 import { ChartFrame } from "../components/ChartFrame";
 import { AnalysisStatus, CheckboxField, ChipButton } from "../components/FormControls";
-import { PanelTitle } from "../components/PageScaffold";
+import { PanelTitle, type PageHandle } from "../components/PageScaffold";
 import {
   SMALL_TEST_SECTIONS,
   SMALL_TEST_SOURCES,
@@ -16,6 +16,7 @@ import {
   type SmallTestSection,
 } from "../shared/cat";
 import { formatAttemptDate, getAnalysedPercentage } from "../utils/format";
+import { exportSmallTestsForLLM } from "../utils/llmExport";
 import { cloneSmallTestInput, toSmallTestInput } from "../utils/mockTransforms";
 
 const smallSectionColors: Record<SmallTestSection, string> = {
@@ -31,11 +32,6 @@ type SectionAnalysis = {
   tests: SmallTest[];
   trendData: Array<{ name: string; Accuracy: number; Score: number }>;
   topicStrength: Array<{ topic: string; accuracy: number; tests: number }>;
-};
-
-type PageHandle = {
-  refresh: () => Promise<void>;
-  loading: boolean;
 };
 
 type SmallTestsPageProps = {
@@ -69,8 +65,14 @@ export function SmallTestsPage({ onStatusChange }: SmallTestsPageProps) {
   }, []);
 
   useEffect(() => {
-    onStatusChange({ refresh: loadSmallTests, loading });
-  }, [loading, onStatusChange]);
+    onStatusChange({
+      refresh: loadSmallTests,
+      loading,
+      exportData: () => exportSmallTestsForLLM(tests),
+      exportDisabled: tests.length === 0,
+      exportLabel: "Export tests",
+    });
+  }, [loading, tests, onStatusChange]);
 
   const unattempted = Math.max(0, draft.totalQuestions - (draft.totalCorrect + draft.totalIncorrect));
   const groupedAnalysis = useMemo(() => buildSectionAnalysis(tests), [tests]);
