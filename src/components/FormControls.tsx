@@ -48,7 +48,7 @@ type AnalysisStatusProps = {
 export function AnalysisStatus({ analysed }: AnalysisStatusProps) {
   return (
     <span className={analysed ? "analysis-status analysed" : "analysis-status"}>
-      {analysed ? "Analysed" : "Pending analysis"}
+      {analysed ? "Analysed" : "Pending Analysis"}
     </span>
   );
 }

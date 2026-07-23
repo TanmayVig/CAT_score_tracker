@@ -132,6 +132,14 @@ h3 {
   grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.65fr);
 }
 
+.mock-entry-layout .list-panel {
+  display: flex;
+  flex-direction: column;
+  height: var(--form-panel-height, auto);
+  max-height: var(--form-panel-height, none);
+  min-height: 0;
+}
+
 .analytics-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 16px;
@@ -357,6 +365,13 @@ input[type="checkbox"] {
   display: grid;
   gap: 10px;
   margin-top: 16px;
+}
+
+.mock-entry-layout .mock-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .mock-item {
@@ -588,6 +603,16 @@ input[type="checkbox"] {
   .analytics-grid,
   .section-analysis-grid {
     grid-template-columns: 1fr;
+  }
+
+  .mock-entry-layout .list-panel {
+    height: auto;
+    max-height: none;
+  }
+
+  .mock-entry-layout .mock-list {
+    overflow-y: visible;
+    padding-right: 0;
   }
 }
 

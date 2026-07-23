@@ -1,5 +1,14 @@
 import { BarChart3, ChevronDown, ChevronRight, Edit3, Plus, Save, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type Ref,
+} from "react";
 import {
   Bar,
   BarChart,
@@ -42,6 +51,8 @@ type MocksPageProps = {
 export function MocksPage({ onStatusChange }: MocksPageProps) {
   const [mocks, setMocks] = useState<MockAttempt[]>([]);
   const [draft, setDraft] = useState<MockAttemptInput>(() => createEmptyMock());
+  const formPanelRef = useRef<HTMLFormElement | null>(null);
+  const [formPanelHeight, setFormPanelHeight] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -65,6 +76,29 @@ export function MocksPage({ onStatusChange }: MocksPageProps) {
 
   useEffect(() => {
     void loadMocks();
+  }, []);
+
+  useLayoutEffect(() => {
+    const formPanel = formPanelRef.current;
+
+    if (!formPanel) {
+      return;
+    }
+
+    const updateFormHeight = () => {
+      setFormPanelHeight(formPanel.getBoundingClientRect().height);
+    };
+
+    updateFormHeight();
+
+    const observer = new ResizeObserver(updateFormHeight);
+    observer.observe(formPanel);
+    window.addEventListener("resize", updateFormHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateFormHeight);
+    };
   }, []);
 
   useEffect(() => {
@@ -231,8 +265,18 @@ export function MocksPage({ onStatusChange }: MocksPageProps) {
     <>
       {error ? <div className="alert">{error}</div> : null}
 
-      <section className="layout-grid">
+      <section
+        className="layout-grid mock-entry-layout"
+        style={
+          formPanelHeight
+            ? ({
+                "--form-panel-height": `${formPanelHeight}px`,
+              } as CSSProperties)
+            : undefined
+        }
+      >
         <MockForm
+          panelRef={formPanelRef}
           draft={draft}
           editing={editingId !== null}
           saving={saving}
@@ -269,13 +313,20 @@ export function MocksPage({ onStatusChange }: MocksPageProps) {
 }
 
 type MockFormProps = {
+  panelRef?: Ref<HTMLFormElement>;
   draft: MockAttemptInput;
   editing: boolean;
   saving: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onReset: () => void;
-  onFieldChange: <Key extends keyof MockAttemptInput>(key: Key, value: MockAttemptInput[Key]) => void;
-  onSectionChange: (section: CatSection, patch: Partial<MockAttemptInput["sections"][CatSection]>) => void;
+  onFieldChange: <Key extends keyof MockAttemptInput>(
+    key: Key,
+    value: MockAttemptInput[Key],
+  ) => void;
+  onSectionChange: (
+    section: CatSection,
+    patch: Partial<MockAttemptInput["sections"][CatSection]>,
+  ) => void;
   onToggleGap: (section: CatSection, topic: string) => void;
   onLearningChange: (section: CatSection, index: number, value: string) => void;
   onAddLearning: (section: CatSection) => void;
@@ -283,6 +334,7 @@ type MockFormProps = {
 };
 
 function MockForm({
+  panelRef,
   draft,
   editing,
   saving,
@@ -296,13 +348,19 @@ function MockForm({
   onRemoveLearning,
 }: MockFormProps) {
   return (
-    <form className="panel form-panel" onSubmit={onSubmit}>
+    <form ref={panelRef} className="panel form-panel" onSubmit={onSubmit}>
       <PanelTitle
-        eyebrow={editing ? "Edit mock" : "Add mock"}
-        title={editing ? "Update attempt" : "New attempt"}
+        eyebrow={editing ? "Edit Mock" : "Add Mock"}
+        title={editing ? "Update Attempt" : "New Attempt"}
         icon={
           editing ? (
-            <button className="icon-button" type="button" onClick={onReset} aria-label="Cancel edit" title="Cancel edit">
+            <button
+              className="icon-button"
+              type="button"
+              onClick={onReset}
+              aria-label="Cancel edit"
+              title="Cancel edit"
+            >
               <X aria-hidden="true" size={18} />
             </button>
           ) : null
@@ -312,21 +370,56 @@ function MockForm({
       <div className="field-grid">
         <label>
           Mock Name
-          <input value={draft.name} onChange={(event) => onFieldChange("name", event.target.value)} placeholder="AIMCAT 2501" required />
+          <input
+            value={draft.name}
+            onChange={(event) => onFieldChange("name", event.target.value)}
+            placeholder="AIMCAT 2501"
+            required
+          />
         </label>
         <label>
           Attempt Date
-          <input type="date" value={draft.attemptDate} onChange={(event) => onFieldChange("attemptDate", event.target.value)} required />
+          <input
+            type="date"
+            value={draft.attemptDate}
+            onChange={(event) =>
+              onFieldChange("attemptDate", event.target.value)
+            }
+            required
+          />
         </label>
         <label>
           Total Marks
-          <input type="number" min="-100" max="300" step="0.01" value={draft.totalMarks} onChange={(event) => onFieldChange("totalMarks", Number(event.target.value))} required />
+          <input
+            type="number"
+            min="-100"
+            max="300"
+            step="0.01"
+            value={draft.totalMarks}
+            onChange={(event) =>
+              onFieldChange("totalMarks", Number(event.target.value))
+            }
+            required
+          />
         </label>
         <label>
           Total Percentile
-          <input type="number" min="0" max="100" step="0.01" value={draft.percentile} onChange={(event) => onFieldChange("percentile", Number(event.target.value))} required />
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={draft.percentile}
+            onChange={(event) =>
+              onFieldChange("percentile", Number(event.target.value))
+            }
+            required
+          />
         </label>
-        <CheckboxField checked={draft.analysed} onChange={(checked) => onFieldChange("analysed", checked)} />
+        <CheckboxField
+          checked={draft.analysed}
+          onChange={(checked) => onFieldChange("analysed", checked)}
+        />
       </div>
 
       <div className="section-stack">
@@ -339,18 +432,46 @@ function MockForm({
             <div className="field-grid compact">
               <label>
                 Marks
-                <input type="number" min="-50" max="150" step="0.01" value={draft.sections[section].marks} onChange={(event) => onSectionChange(section, { marks: Number(event.target.value) })} required />
+                <input
+                  type="number"
+                  min="-50"
+                  max="150"
+                  step="0.01"
+                  value={draft.sections[section].marks}
+                  onChange={(event) =>
+                    onSectionChange(section, {
+                      marks: Number(event.target.value),
+                    })
+                  }
+                  required
+                />
               </label>
               <label>
                 Percentile
-                <input type="number" min="0" max="100" step="0.01" value={draft.sections[section].percentile} onChange={(event) => onSectionChange(section, { percentile: Number(event.target.value) })} required />
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={draft.sections[section].percentile}
+                  onChange={(event) =>
+                    onSectionChange(section, {
+                      percentile: Number(event.target.value),
+                    })
+                  }
+                  required
+                />
               </label>
             </div>
 
             <div className="topic-group" aria-label={`${section} gaps`}>
               <h4 className="color-grey">Gaps: </h4>
               {GAP_TOPICS[section].map((topic) => (
-                <ChipButton key={topic} selected={draft.sections[section].gaps.includes(topic)} onClick={() => onToggleGap(section, topic)}>
+                <ChipButton
+                  key={topic}
+                  selected={draft.sections[section].gaps.includes(topic)}
+                  onClick={() => onToggleGap(section, topic)}
+                >
                   {topic}
                 </ChipButton>
               ))}
@@ -359,13 +480,29 @@ function MockForm({
             <div className="learning-list">
               {draft.sections[section].learnings.map((learning, index) => (
                 <div className="learning-row" key={`${section}-${index}`}>
-                  <input value={learning} onChange={(event) => onLearningChange(section, index, event.target.value)} placeholder={`${section} Learning`} />
-                  <button className="icon-button" type="button" onClick={() => onRemoveLearning(section, index)} aria-label="Remove learning" title="Remove learning">
+                  <input
+                    value={learning}
+                    onChange={(event) =>
+                      onLearningChange(section, index, event.target.value)
+                    }
+                    placeholder={`${section} Learning`}
+                  />
+                  <button
+                    className="icon-button"
+                    type="button"
+                    onClick={() => onRemoveLearning(section, index)}
+                    aria-label="Remove learning"
+                    title="Remove learning"
+                  >
                     <X aria-hidden="true" size={16} />
                   </button>
                 </div>
               ))}
-              <button className="ghost-button small" type="button" onClick={() => onAddLearning(section)}>
+              <button
+                className="ghost-button small"
+                type="button"
+                onClick={() => onAddLearning(section)}
+              >
                 <Plus aria-hidden="true" size={16} />
                 Learning
               </button>
