@@ -1,5 +1,10 @@
 import type { MockAttempt, MockAttemptInput, SmallTest, SmallTestInput } from "./shared/cat";
 
+export type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...options,
@@ -66,5 +71,12 @@ export function updateSmallTest(id: number, test: SmallTestInput): Promise<Small
 export function deleteSmallTest(id: number): Promise<void> {
   return request<void>(`/api/small-tests/${id}`, {
     method: "DELETE"
+  });
+}
+
+export function sendChatMessage(messages: ChatMessage[]): Promise<{ message: ChatMessage }> {
+  return request<{ message: ChatMessage }>("/api/chat", {
+    method: "POST",
+    body: JSON.stringify({ messages })
   });
 }

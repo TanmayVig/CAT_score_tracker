@@ -91,6 +91,11 @@ type SmallTestRow = {
   updated_at: string;
 };
 
+type ChatMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+};
+
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
 
@@ -323,6 +328,141 @@ function getSmallTestById(id: number): SmallTest | null {
   return row ? rowToSmallTest(row) : null;
 }
 
+function getAllMocks(): MockAttempt[] {
+  const rows = db.prepare("SELECT * FROM mocks ORDER BY date(attempt_date) ASC, datetime(created_at) ASC, id ASC").all() as MockRow[];
+  return rows.map(rowToMock);
+}
+
+function getAllSmallTests(): SmallTest[] {
+  const rows = db.prepare("SELECT * FROM small_tests ORDER BY date(attempt_date) ASC, datetime(created_at) ASC, id ASC").all() as SmallTestRow[];
+  return rows.map(rowToSmallTest);
+}
+
+function buildTrackerContext() {
+  const mocks = getAllMocks();
+  const smallTests = getAllSmallTests();
+  const gapCounts = new Map<string, number>();
+
+  mocks.forEach((mock) => {
+    CAT_SECTIONS.forEach((section) => {
+      mock.sections[section].gaps.forEach((gap) => {
+        gapCounts.set(`${section}: ${gap}`, (gapCounts.get(`${section}: ${gap}`) ?? 0) + 1);
+      });
+    });
+  });
+
+  const recentMocks = mocks.slice(-8);
+  const recentSmallTests = smallTests.slice(-20);
+  const prominentGaps = [...gapCounts.entries()]
+    .sort((first, second) => second[1] - first[1])
+    .slice(0, 12)
+    .map(([gap, count]) => ({ gap, count }));
+
+  return [
+    "You are Hermes, a local AI prep coach for the user.",
+    "The user is preparing for CAT 2026. Answer as a practical CAT mentor: concise, analytical, and strategy-oriented.",
+    "Use the tracker data below as the source of truth for marks, percentiles, gaps, learnings, analysed status, and small-test performance.",
+    "When data is insufficient, say what is missing and give a reasonable next tracking step.",
+    "",
+    "CAT tracker context:",
+    JSON.stringify(
+      {
+        examGoal: "CAT 2026",
+        fullMocks: {
+          total: mocks.length,
+          analysed: mocks.filter((mock) => mock.analysed).length,
+          prominentGaps,
+          recent: recentMocks,
+        },
+        smallTests: {
+          total: smallTests.length,
+          analysed: smallTests.filter((test) => test.analysed).length,
+          recent: recentSmallTests,
+        },
+      },
+      null,
+      2,
+    ),
+  ].join("\n");
+}
+
+function validateChatPayload(payload: unknown): { messages?: ChatMessage[]; error?: string } {
+  const body = payload as { messages?: ChatMessage[] };
+
+  if (!body || !Array.isArray(body.messages) || body.messages.length === 0) {
+    return { error: "At least one chat message is required." };
+  }
+
+  const messages = body.messages
+    .filter((message) => message && (message.role === "user" || message.role === "assistant") && typeof message.content === "string")
+    .map((message) => ({
+      role: message.role,
+      content: message.content.trim(),
+    }))
+    .filter((message) => message.content.length > 0);
+
+  if (messages.length === 0) {
+    return { error: "A non-empty chat message is required." };
+  }
+
+  return { messages: messages.slice(-12) };
+}
+
+function getHermesConfig() {
+  return {
+    apiUrl: process.env.HERMES_API_URL ?? "http://127.0.0.1:11434/api/chat",
+    model: process.env.HERMES_MODEL ?? "llama3.2:3b",
+    apiStyle: (process.env.HERMES_API_STYLE ?? "ollama").toLowerCase(),
+  };
+}
+
+async function askHermes(messages: ChatMessage[]) {
+  const { apiUrl, model, apiStyle } = getHermesConfig();
+  const systemMessage: ChatMessage = {
+    role: "system",
+    content: buildTrackerContext(),
+  };
+
+  if (apiStyle === "openai") {
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages: [systemMessage, ...messages],
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Hermes returned ${response.status}: ${await response.text()}`);
+    }
+
+    const body = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    return body.choices?.[0]?.message?.content?.trim() ?? "";
+  }
+
+  const response = await fetch(apiUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages: [systemMessage, ...messages],
+      stream: false,
+      options: {
+        temperature: 0.3,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Hermes returned ${response.status}: ${await response.text()}`);
+  }
+
+  const body = (await response.json()) as { message?: { content?: string }; response?: string };
+  return (body.message?.content ?? body.response ?? "").trim();
+}
+
 app.get("/api/health", (_request, response) => {
   response.json({ ok: true, database: dbPath });
 });
@@ -499,6 +639,36 @@ app.delete("/api/small-tests/:id", (request, response) => {
   }
 
   response.status(204).send();
+});
+
+app.post("/api/chat", async (request, response) => {
+  const result = validateChatPayload(request.body);
+
+  if (!result.messages) {
+    response.status(400).json({ error: result.error });
+    return;
+  }
+
+  try {
+    const content = await askHermes(result.messages);
+
+    if (!content) {
+      response.status(502).json({ error: "Hermes returned an empty response." });
+      return;
+    }
+
+    response.json({
+      message: {
+        role: "assistant",
+        content,
+      },
+    });
+  } catch (caughtError) {
+    const message = caughtError instanceof Error ? caughtError.message : "Unable to reach Hermes.";
+    response.status(502).json({
+      error: `${message} Check that Hermes is running and HERMES_API_URL/HERMES_MODEL are correct.`,
+    });
+  }
 });
 
 app.use((_request, response) => {

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { BarChart3, ClipboardList, Download, RefreshCw } from "lucide-react";
+import { BarChart3, ClipboardList, Download, MessageSquare, RefreshCw } from "lucide-react";
 
-export type ActivePage = "mocks" | "small-tests";
+export type ActivePage = "mocks" | "small-tests" | "chat";
 export type PageHandle = {
   refresh: () => Promise<void>;
   loading: boolean;
@@ -29,10 +29,12 @@ export function AppHeader({ activePage, loading, exportDisabled, exportLabel = "
           <h1>CAT Mock Tracker</h1>
         </div>
         <div className="topbar-actions">
-          <button className="ghost-button" type="button" onClick={onExport} disabled={!onExport || exportDisabled}>
-            <Download aria-hidden="true" size={18} />
-            {exportLabel}
-          </button>
+          {onExport ? (
+            <button className="ghost-button" type="button" onClick={onExport} disabled={exportDisabled}>
+              <Download aria-hidden="true" size={18} />
+              {exportLabel}
+            </button>
+          ) : null}
           <button className="ghost-button" type="button" onClick={onRefresh} disabled={loading}>
             <RefreshCw aria-hidden="true" size={18} />
             Refresh
@@ -56,6 +58,14 @@ export function AppHeader({ activePage, loading, exportDisabled, exportLabel = "
         >
           <ClipboardList aria-hidden="true" size={17} />
           Small Tests
+        </button>
+        <button
+          className={activePage === "chat" ? "active" : ""}
+          type="button"
+          onClick={() => onPageChange("chat")}
+        >
+          <MessageSquare aria-hidden="true" size={17} />
+          Chat
         </button>
       </nav>
     </>

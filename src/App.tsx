@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { AppHeader, type ActivePage, type PageHandle } from "./components/PageScaffold";
+import { ChatPage } from "./pages/ChatPage";
 import { MocksPage } from "./pages/MocksPage";
 import { SmallTestsPage } from "./pages/SmallTestsPage";
 
@@ -14,6 +15,7 @@ function App() {
   const [pageHandles, setPageHandles] = useState<Record<ActivePage, PageHandle>>({
     mocks: idleHandle,
     "small-tests": idleHandle,
+    chat: idleHandle,
   });
 
   const updatePageHandle = useCallback(
@@ -30,6 +32,10 @@ function App() {
     (handle: PageHandle) => updatePageHandle("small-tests", handle),
     [updatePageHandle],
   );
+  const updateChatHandle = useCallback(
+    (handle: PageHandle) => updatePageHandle("chat", handle),
+    [updatePageHandle],
+  );
 
   return (
     <main className="app-shell">
@@ -43,11 +49,9 @@ function App() {
         onPageChange={setActivePage}
       />
 
-      {activePage === "mocks" ? (
-        <MocksPage onStatusChange={updateMocksHandle} />
-      ) : (
-        <SmallTestsPage onStatusChange={updateSmallTestsHandle} />
-      )}
+      {activePage === "mocks" ? <MocksPage onStatusChange={updateMocksHandle} /> : null}
+      {activePage === "small-tests" ? <SmallTestsPage onStatusChange={updateSmallTestsHandle} /> : null}
+      {activePage === "chat" ? <ChatPage onStatusChange={updateChatHandle} /> : null}
     </main>
   );
 }
